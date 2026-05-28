@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>polymarket-arbitrage-test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --blue: #58a6ff;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--fg); margin: 0; font-family: var(--mono); font-size: 13px; }
+  header { padding: 12px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  header h1 { font-size: 14px; margin: 0; font-weight: 600; }
+  header .right { display: flex; gap: 14px; align-items: center; }
+  header .status { color: var(--muted); font-size: 12px; }
+  header select { background: var(--panel); color: var(--fg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-family: var(--mono); font-size: 12px; }
+  .stale-banner { display: none; background: rgba(248,81,73,.15); color: var(--red); border-bottom: 1px solid var(--red); padding: 8px 18px; font-size: 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; }
+  .full { grid-column: 1 / -1; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .panel .body { padding: 8px 12px; overflow-x: auto; max-height: 520px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 4px 8px; border-bottom: 1px solid #1f242c; white-space: nowrap; }
+  tr:hover td { background: #1c2129; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .stale { color: var(--muted); }
+  .pill { display: inline-block; padding: 1px 6px; border-radius: 9px; font-size: 11px; }
+  .pill.open { background: rgba(63,185,80,.15); color: var(--green); }
+  .pill.closed { background: rgba(139,148,158,.15); color: var(--muted); }
+  .pill.kalshi { background: rgba(88,166,255,.15); color: var(--blue); }
+  .pill.polymarket { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .footer { padding: 8px 18px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); }
+  .footer span { margin-right: 18px; }
+  .pnl-row { padding: 8px 12px; display: flex; gap: 24px; }
+  .pnl-row > div { display: flex; flex-direction: column; gap: 2px; }
+  .pnl-row .label { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+  .pnl-row .value { font-size: 16px; font-variant-numeric: tabular-nums; }
+  .truncate { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  .age { color: var(--muted); font-size: 11px; }
+  tr.row-profit td { background: rgba(63,185,80,.07); }
+  tr.row-profit:hover td { background: rgba(63,185,80,.13); }
+  tr.row-loss td { background: rgba(248,81,73,.05); }
+  .spark { width: 110px; height: 28px; display: block; }
+  .reason { color: var(--muted); font-size: 10px; }
+  .chart-wrap { padding: 8px 12px; height: 280px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>polymarket-arbitrage-test</h1>
+  <div class="right">
+    <label style="color:var(--muted);font-size:12px">refresh
+      <select id="refresh-sel">
+        <option value="500">0.5s</option>
+        <option value="1000" selected>1s</option>
+        <option value="2000">2s</option>
+        <option value="5000">5s</option>
+      </select>
+    </label>
+    <span class="status" id="status">connecting…</span>
+  </div>
+</header>
+
+<div class="stale-banner" id="stale-banner"></div>
+
+<div class="grid">
+
+  <div class="panel">
+    <h2>P&amp;L summary</h2>
+    <div class="pnl-row" id="pnl"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Storage</h2>
+    <div class="pnl-row" id="counts"></div>
+  </div>
+
+  <div class="panel full">
+    <h2>Feed health (last 60s)</h2>
+    <div class="pnl-row" id="feed-health"></div>
+  </div>
+
+  <div class="panel full">
+    <h2>Live quotes by pair</h2>
+    <div class="body">
+      <table id="quotes-tbl">
+        <thead>
+          <tr>
+            <th>Pair</th>
+            <th class="num">Poly YES bid/ask</th>
+            <th class="num">Poly NO bid/ask</th>
+            <th class="num">Kalshi YES bid/ask</th>
+            <th class="num">Edge A<br>(poly→kalshi NO)</th>
+            <th class="num">Edge B<br>(kalshi→poly NO)</th>
+            <th>Net edge sparkline</th>
+            <th>Resolves</th>
+            <th>Age</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel full">
+    <h2>Resolutions</h2>
+    <div class="pnl-row" id="resolutions-summary"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Recent arb candidates</h2>
+    <div class="body">
+      <table id="arbs-tbl">
+        <thead>
+          <tr>
+            <th>Age</th>
+            <th>Pair</th>
+            <th>Direction</th>
+            <th class="num">Net</th>
+            <th class="num">Gross</th>
+            <th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Paper positions</h2>
+    <div class="body">
+      <table id="pos-tbl">
+        <thead>
+          <tr>
+            <th>id</th>
+            <th>Status</th>
+            <th>Pair</th>
+            <th>Dir</th>
+            <th class="num">Size</th>
+            <th class="num">Mark</th>
+            <th class="num">MAE</th>
+            <th class="num">MFE</th>
+            <th class="num">Held→exp</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel full">
+    <h2>Net edge over time (top 5 active pairs)</h2>
+    <div class="chart-wrap"><canvas id="big-chart"></canvas></div>
+  </div>
+
+  <div class="panel full">
+    <h2>Live event stream (last 30)</h2>
+    <div class="body">
+      <table id="events-tbl">
+        <thead><tr><th>Age</th><th>Venue</th><th>Event type</th><th>Market</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <span id="last-refresh"></span>
+  <span>Refreshing every 2s</span>
+</div>
+
+<script>
+const fmt = (v, dp = 4) => (v == null || isNaN(v)) ? '–' : (typeof v === 'number' ? v.toFixed(dp) : v);
+const sgn = (v, dp = 3) => {
+  if (v == null || isNaN(v)) return '–';
+  const cls = v >= 0 ? 'pos' : 'neg';
+  return `<span class="${cls}">${v >= 0 ? '+' : ''}${v.toFixed(dp)}</span>`;
+};
+const ageStr = (ts_ns, now_ns) => {
+  if (ts_ns == null) return '–';
+  const s = (now_ns - ts_ns) / 1e9;
+  if (s < 60) return s.toFixed(0) + 's';
+  if (s < 3600) return (s/60).toFixed(1) + 'm';
+  return (s/3600).toFixed(1) + 'h';
+};
+const truncate = (s, n = 30) => (s && s.length > n) ? s.slice(0, n) + '…' : (s || '');
+
+function renderPnl(pnl) {
+  const total = (pnl.realized || 0) + (pnl.mark_open || 0);
+  document.getElementById('pnl').innerHTML = `
+    <div><span class="label">Realized</span><span class="value">${sgn(pnl.realized || 0, 2)}</span></div>
+    <div><span class="label">Open MTM</span><span class="value">${sgn(pnl.mark_open || 0, 2)}</span></div>
+    <div><span class="label">Held→exp</span><span class="value">${sgn(pnl.held_open || 0, 2)}</span></div>
+    <div><span class="label">Total now</span><span class="value">${sgn(total, 2)}</span></div>
+  `;
+}
+
+function renderCounts(c) {
+  document.getElementById('counts').innerHTML = `
+    <div><span class="label">Events</span><span class="value">${c.events||0}</span></div>
+    <div><span class="label">Quotes</span><span class="value">${c.quotes||0}</span></div>
+    <div><span class="label">Trades</span><span class="value">${c.trades||0}</span></div>
+    <div><span class="label">Arb rows</span><span class="value">${c.arbs||0}</span></div>
+    <div><span class="label">Positions</span><span class="value">${c.positions||0} (${c.open_positions||0} open)</span></div>
+  `;
+}
+
+function renderFeedHealth(fh) {
+  if (!fh) { document.getElementById('feed-health').innerHTML = ''; return; }
+  const fmtAge = a => a == null ? '–' : (a < 1 ? (a*1000).toFixed(0) + 'ms' : a < 60 ? a.toFixed(1) + 's' : (a/60).toFixed(1) + 'm');
+  const healthClass = a => a == null ? 'neg' : (a < 5 ? 'pos' : (a < 30 ? '' : 'neg'));
+  const parts = [];
+  for (const [v, h] of Object.entries(fh)) {
+    parts.push(`
+      <div>
+        <span class="label">${v} rate</span>
+        <span class="value">${h.events_per_sec.toFixed(1)}/s</span>
+      </div>
+      <div>
+        <span class="label">${v} age</span>
+        <span class="value ${healthClass(h.last_event_age_s)}">${fmtAge(h.last_event_age_s)}</span>
+      </div>
+    `);
+  }
+  document.getElementById('feed-health').innerHTML = parts.join('');
+}
+
+// Inline SVG sparkline — picks whichever direction has the larger absolute peak,
+// so the most "interesting" series wins the limited horizontal space.
+function sparkline(history) {
+  const a = history?.poly_yes_kalshi_no || [];
+  const b = history?.kalshi_yes_poly_no || [];
+  const peakA = a.reduce((m, p) => Math.max(m, Math.abs(p.net_edge)), 0);
+  const peakB = b.reduce((m, p) => Math.max(m, Math.abs(p.net_edge)), 0);
+  const pts = peakA >= peakB ? a : b;
+  const dir = peakA >= peakB ? 'A' : 'B';
+  if (pts.length < 2) return '<span class="reason">no data</span>';
+  const w = 110, h = 28, pad = 2;
+  const vals = pts.map(p => p.net_edge);
+  const min = Math.min(...vals, 0);
+  const max = Math.max(...vals, 0);
+  const range = (max - min) || 1;
+  const xs = (i) => pad + i * (w - 2*pad) / (pts.length - 1);
+  const ys = (v) => h - pad - (v - min) / range * (h - 2*pad);
+  const zeroY = ys(0);
+  const polyline = pts.map((p, i) => `${xs(i)},${ys(p.net_edge)}`).join(' ');
+  const lastVal = vals[vals.length - 1];
+  const lastColor = lastVal >= 0 ? '#3fb950' : '#f85149';
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}">
+    <line x1="0" x2="${w}" y1="${zeroY}" y2="${zeroY}" stroke="#30363d" stroke-width="0.5" stroke-dasharray="2,2"/>
+    <polyline fill="none" stroke="${lastColor}" stroke-width="1.2" points="${polyline}"/>
+    <circle cx="${xs(pts.length - 1)}" cy="${ys(lastVal)}" r="1.8" fill="${lastColor}"/>
+    <text x="${w - 2}" y="9" text-anchor="end" fill="#8b949e" font-size="9" font-family="monospace">${dir}</text>
+  </svg>`;
+}
+
+function resolutionCell(r, now_ns) {
+  if (!r) return '<span class="reason">—</span>';
+  const pr = r.poly_result, kr = r.kalshi_result;
+  if (pr && kr) {
+    const same = pr === kr;
+    const cls = same ? 'pos' : 'neg';
+    const lbl = same ? 'resolved' : 'DIVERGENT';
+    return `<span class="${cls}">${lbl} P:${pr} K:${kr}</span>`;
+  }
+  // Use the earlier of the two close times to convey time-to-close
+  const pc = r.poly_close_ts_ns, kc = r.kalshi_close_ts_ns;
+  if (!pc && !kc) return '<span class="reason">—</span>';
+  const earliest = pc && kc ? Math.min(pc, kc) : (pc || kc);
+  const delta_s = (earliest - now_ns) / 1e9;
+  if (delta_s > 0) {
+    const days = delta_s / 86400;
+    if (days > 30) return `<span class="reason">in ${(days/30).toFixed(0)}mo</span>`;
+    if (days > 1)  return `<span class="reason">in ${days.toFixed(0)}d</span>`;
+    const hrs = delta_s / 3600;
+    if (hrs > 1) return `<span class="reason">in ${hrs.toFixed(0)}h</span>`;
+    return `<span class="reason">in ${(delta_s/60).toFixed(0)}m</span>`;
+  }
+  // Past close, awaiting outcome
+  return '<span class="neg">awaiting result</span>';
+}
+
+function renderQuotes(pairs, now_ns) {
+  const tbody = document.querySelector('#quotes-tbl tbody');
+  tbody.innerHTML = pairs.map(p => {
+    const py = p.poly_yes || {};
+    const pn = p.poly_no || {};
+    const k = p.kalshi || {};
+    const ageMax = Math.max(py.ts_ns || 0, pn.ts_ns || 0, k.ts_ns || 0);
+    const ea = p.edges?.poly_yes_kalshi_no_gross;
+    const eb = p.edges?.kalshi_yes_poly_no_gross;
+    return `<tr>
+      <td>${p.name}</td>
+      <td class="num">${fmt(py.best_bid)} / ${fmt(py.best_ask)}</td>
+      <td class="num">${fmt(pn.best_bid)} / ${fmt(pn.best_ask)}</td>
+      <td class="num">${fmt(k.best_bid)} / ${fmt(k.best_ask)}</td>
+      <td class="num">${sgn(ea, 4)}</td>
+      <td class="num">${sgn(eb, 4)}</td>
+      <td>${sparkline(p.edge_history)}</td>
+      <td>${resolutionCell(p.resolution, now_ns)}</td>
+      <td class="age">${ageStr(ageMax, now_ns)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderResolutions(r) {
+  if (!r) return;
+  document.getElementById('resolutions-summary').innerHTML = `
+    <div><span class="label">Pairs resolved</span><span class="value">${r.pairs_resolved||0}</span></div>
+    <div><span class="label">Pairs past close (awaiting)</span><span class="value ${r.pairs_pending > 0 ? 'neg' : ''}">${r.pairs_pending||0}</span></div>
+    <div><span class="label">Positions auto-resolved</span><span class="value">${r.positions_resolved||0}</span></div>
+  `;
+}
+
+function renderArbs(arbs, now_ns) {
+  const tbody = document.querySelector('#arbs-tbl tbody');
+  tbody.innerHTML = arbs.map(a => `<tr>
+    <td class="age">${ageStr(a.ts_ns, now_ns)}</td>
+    <td class="truncate">${a.pair_name}</td>
+    <td>${a.direction}</td>
+    <td class="num">${sgn(a.net_edge, 4)}</td>
+    <td class="num">${sgn(a.gross_edge, 4)}</td>
+    <td class="num">${fmt(a.cost)}</td>
+  </tr>`).join('');
+}
+
+function renderPositions(positions) {
+  const tbody = document.querySelector('#pos-tbl tbody');
+  tbody.innerHTML = positions.map(p => {
+    const status = p.closed_ts_ns ? 'closed' : 'open';
+    const mark = p.closed_ts_ns ? p.close_pnl : p.mark_pnl;
+    const reason = p.close_reason ? `<div class="reason">${p.close_reason}</div>` : '';
+    let cls = '';
+    if (status === 'open' && mark != null) {
+      cls = mark > 0 ? ' class="row-profit"' : (mark < -1.5 ? ' class="row-loss"' : '');
+    }
+    return `<tr${cls}>
+      <td>${p.id}</td>
+      <td><span class="pill ${status}">${status.toUpperCase()}</span>${reason}</td>
+      <td class="truncate">${p.pair_name}</td>
+      <td>${p.direction === 'poly_yes_kalshi_no' ? 'A' : 'B'}</td>
+      <td class="num">${p.size}</td>
+      <td class="num">${sgn(mark, 2)}</td>
+      <td class="num">${sgn(p.max_adverse_pnl, 2)}</td>
+      <td class="num">${sgn(p.max_favorable_pnl, 2)}</td>
+      <td class="num">${sgn(p.held_to_expiry_pnl, 2)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Chart.js big chart for top-N most-active pairs
+let bigChart = null;
+const PALETTE = ['#58a6ff','#3fb950','#d29922','#f85149','#bc8cff','#f78166','#79c0ff','#56d364'];
+
+function renderBigChart(pairs) {
+  // Pick top 5 by max |net_edge| across either direction
+  const ranked = pairs.map(p => {
+    const all = [...(p.edge_history?.poly_yes_kalshi_no || []), ...(p.edge_history?.kalshi_yes_poly_no || [])];
+    const peak = all.reduce((m, x) => Math.max(m, Math.abs(x.net_edge)), 0);
+    // Pick the direction with the higher peak for charting
+    const dirA = p.edge_history?.poly_yes_kalshi_no || [];
+    const dirB = p.edge_history?.kalshi_yes_poly_no || [];
+    const peakA = dirA.reduce((m, x) => Math.max(m, Math.abs(x.net_edge)), 0);
+    const peakB = dirB.reduce((m, x) => Math.max(m, Math.abs(x.net_edge)), 0);
+    const series = peakA >= peakB ? dirA : dirB;
+    const tag = peakA >= peakB ? 'A' : 'B';
+    return { name: p.name, peak, series, tag };
+  }).filter(x => x.series.length >= 2)
+    .sort((a, b) => b.peak - a.peak)
+    .slice(0, 5);
+
+  if (ranked.length === 0) {
+    if (bigChart) { bigChart.destroy(); bigChart = null; }
+    return;
+  }
+
+  // Build a unified timeline (use the union of timestamps, x = sec ago)
+  const now_ns = Date.now() * 1e6;
+  const datasets = ranked.map((r, i) => ({
+    label: `${r.name} [${r.tag}]`,
+    data: r.series.map(pt => ({ x: (pt.ts_ns - now_ns) / 1e9, y: pt.net_edge })),
+    borderColor: PALETTE[i % PALETTE.length],
+    backgroundColor: PALETTE[i % PALETTE.length],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    pointHoverRadius: 3,
+    tension: 0.15,
+  }));
+
+  const config = {
+    type: 'line',
+    data: { datasets },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { type: 'linear', title: { display: true, text: 'seconds ago', color: '#8b949e' },
+             ticks: { color: '#8b949e' }, grid: { color: '#1f242c' } },
+        y: { title: { display: true, text: 'net edge per $1', color: '#8b949e' },
+             ticks: { color: '#8b949e', callback: v => v.toFixed(3) },
+             grid: { color: '#1f242c' } },
+      },
+      plugins: {
+        legend: { labels: { color: '#e6edf3', font: { size: 11 } } },
+        tooltip: { mode: 'nearest', intersect: false },
+      },
+    },
+  };
+
+  if (bigChart) {
+    bigChart.data = config.data;
+    bigChart.options = config.options;
+    bigChart.update('none');
+  } else {
+    const ctx = document.getElementById('big-chart').getContext('2d');
+    bigChart = new Chart(ctx, config);
+  }
+}
+
+function renderEvents(events, now_ns) {
+  const tbody = document.querySelector('#events-tbl tbody');
+  tbody.innerHTML = events.map(e => `<tr>
+    <td class="age">${ageStr(e.ts_ns, now_ns)}</td>
+    <td><span class="pill ${e.venue}">${e.venue}</span></td>
+    <td>${e.event_type}</td>
+    <td class="truncate" title="${e.market_id || ''}">${truncate(e.market_id, 50)}</td>
+  </tr>`).join('');
+}
+
+function checkStale(s) {
+  // Newest event ts across the response — proxy for "is the writer alive"
+  let newest = 0;
+  for (const e of (s.events || [])) newest = Math.max(newest, e.ts_ns || 0);
+  for (const p of (s.pairs || [])) {
+    for (const q of [p.poly_yes, p.poly_no, p.kalshi]) {
+      if (q && q.ts_ns) newest = Math.max(newest, q.ts_ns);
+    }
+  }
+  const ageS = newest ? (s.now_ns - newest) / 1e9 : 1e9;
+  const banner = document.getElementById('stale-banner');
+  if (ageS > 30) {
+    banner.style.display = 'block';
+    const ageStr = ageS > 60 ? Math.round(ageS / 60) + ' min' : Math.round(ageS) + ' sec';
+    banner.innerText = `⚠ No fresh data for ${ageStr}. Is \`python -m scripts.run_feeds\` running?`;
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/state');
+    if (!r.ok) {
+      const t = await r.text();
+      document.getElementById('status').innerText = 'error: ' + r.status + ' ' + t.slice(0, 100);
+      return;
+    }
+    const s = await r.json();
+    document.getElementById('status').innerText = 'live · ' + new Date().toLocaleTimeString();
+    checkStale(s);
+    renderPnl(s.pnl);
+    renderCounts(s.counts);
+    renderFeedHealth(s.feed_health);
+    renderQuotes(s.pairs, s.now_ns);
+    renderArbs(s.arbs, s.now_ns);
+    renderPositions(s.positions);
+    renderEvents(s.events, s.now_ns);
+    renderBigChart(s.pairs);
+    renderResolutions(s.resolutions);
+    document.getElementById('last-refresh').innerText = 'Last update: ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('status').innerText = 'offline (' + e.message + ')';
+  }
+}
+
+let REFRESH_MS = 1000;
+let timer = null;
+function setRefreshRate(ms) {
+  REFRESH_MS = ms;
+  if (timer) clearInterval(timer);
+  timer = setInterval(refresh, REFRESH_MS);
+  const rateEl = document.querySelector('.footer span:last-child');
+  if (rateEl) rateEl.innerText = 'Refreshing every ' + (ms < 1000 ? ms + 'ms' : (ms / 1000) + 's');
+}
+
+document.getElementById('refresh-sel').addEventListener('change', e => {
+  setRefreshRate(parseInt(e.target.value, 10));
+});
+
+refresh();
+setRefreshRate(REFRESH_MS);
+</script>
+
+</body>
+</html>

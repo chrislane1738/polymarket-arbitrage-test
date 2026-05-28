@@ -1,0 +1,186 @@
+# Manual market pairings between Polymarket and Kalshi.
+#
+# Each entry pairs one Polymarket binary market (yes_token_id + no_token_id)
+# with one Kalshi market ticker that resolves on the same event.
+#
+# Seed below: June 17, 2026 FOMC decision — five mutually-exclusive outcomes,
+# all live on both venues. As of seeding, "no change" is the dominant outcome
+# at ~97% on both sides; the tails (cut/hike 25bps and 50+) trade thin and are
+# the most likely candidates for short-lived cross-venue dislocations.
+#
+# Re-seed any time with:
+#   python -m scripts.discover "<topic>"
+# and copy the printed condition_id / clob_tokens + Kalshi ticker into a new
+# block here.
+
+pairs:
+  - name: "Fed Jun26 - No change"
+    polymarket:
+      yes_token_id: "30767812841387255642892182147223249245545002662653079696958384408588201824258"
+      no_token_id:  "40302938956091099752849867077837976978448552504757012372843872340644441002059"
+    kalshi:
+      ticker: "KXFEDDECISION-26JUN-H0"
+
+  - name: "Fed Jun26 - Cut 25bps"
+    polymarket:
+      yes_token_id: "65193234666628291664907888364936366210889305490897648116746073820519263548476"
+      no_token_id:  "28290293140018107764072370767749010110409017615323596573647425138985988593200"
+    kalshi:
+      ticker: "KXFEDDECISION-26JUN-C25"
+
+  - name: "Fed Jun26 - Cut 50+bps"
+    polymarket:
+      yes_token_id: "110884561568299698460551977852169332756450294345019257864587852438060900499251"
+      no_token_id:  "43657246144121396803720838555832481461017693669899677632500878505194847879265"
+    kalshi:
+      ticker: "KXFEDDECISION-26JUN-C26"
+
+  - name: "Fed Jun26 - Hike 25bps"
+    polymarket:
+      yes_token_id: "54688507565884542490190759171719899637342914252863057837926715255559077706253"
+      no_token_id:  "11860607772349332991076953711276491732463246158502547301609855788223626456599"
+    kalshi:
+      ticker: "KXFEDDECISION-26JUN-H25"
+
+  - name: "Fed Jun26 - Hike 50+bps"
+    polymarket:
+      yes_token_id: "11019686559003253359318459636510036787281809199165975947920974072245914352862"
+      no_token_id:  "58879299945592013948525261328444396601397408171613924748929269227017026499887"
+    kalshi:
+      ticker: "KXFEDDECISION-26JUN-H26"
+
+  # ----------------------------- Bitcoin price targets -----------------------------
+  # Resolution caveat: Polymarket sources prices from Coinbase/Binance composite,
+  # Kalshi uses CME CF Bitcoin Reference Rate. A brief intra-day spike to the
+  # threshold can resolve one venue YES while the other resolves NO. Real money
+  # users should size accordingly.
+
+  - name: "BTC reach $85k in May 2026"
+    polymarket:
+      yes_token_id: "27263818818572382308786837280052567231404272927433091805576135922512093801450"
+      no_token_id:  "20970486708225968446432942645112973151689471027935743232114605753310238562505"
+    kalshi:
+      ticker: "KXBTCMAXMON-BTC-26MAY31-8500000"
+
+  - name: "BTC reach $90k in May 2026"
+    polymarket:
+      yes_token_id: "82333550650994719016339808110389313847426073918923886033931546451300666500527"
+      no_token_id:  "65358559479619632690055959333044473452303412483016001023035774148763874619559"
+    kalshi:
+      ticker: "KXBTCMAXMON-BTC-26MAY31-9000000"
+
+  - name: "BTC reach $95k in May 2026"
+    polymarket:
+      yes_token_id: "75068694519235284923554014292149365814905672168186840117079081703620417733601"
+      no_token_id:  "16860625162494210689460390678673570106526806365249676317752175720098998598727"
+    kalshi:
+      ticker: "KXBTCMAXMON-BTC-26MAY31-9500000"
+
+  - name: "BTC reach $100k in 2026"
+    polymarket:
+      yes_token_id: "56078938060096976448086754249497300447360333783952000147427828224794011030104"
+      no_token_id:  "11291662904897713174667903388388696640643610556195928998276904135282270136756"
+    kalshi:
+      ticker: "KXBTCMAXY-26DEC31-99999.99"
+
+  - name: "BTC reach $200k in 2026"
+    polymarket:
+      yes_token_id: "61368943128255287414565270336856615453000675377332178800733742873558311943412"
+      no_token_id:  "96993471854400156408670527613150944443359272190785251193551242374636006072800"
+    kalshi:
+      ticker: "KXBTCMAXY-26DEC31-199999.99"
+
+  # ----------------------------- Sports: NBA + NHL Championships -----------------------------
+  # Mid-priced (0.10-0.65) so Kalshi fees are large in absolute terms — most
+  # cross-venue diffs get eaten by fees and won't flag. Books are deeper than
+  # the tail markets, however, so an edge here is more executable.
+
+  - name: "NBA 2026 - OKC Thunder"
+    polymarket:
+      yes_token_id: "49500299856831034491021962156746701298730459370557900271970866855042624695770"
+      no_token_id:  "44914465637297319816681463234953032477919413063019359633128421605039733545953"
+    kalshi:
+      ticker: "KXNBA-26-OKC"
+
+  - name: "NBA 2026 - NY Knicks"
+    polymarket:
+      yes_token_id: "20257190540739490630509657713144742134547949967093643458458133445357169845406"
+      no_token_id:  "1770840559776249239623005379825945674336282130390798724203946923853499387834"
+    kalshi:
+      ticker: "KXNBA-26-NYK"
+
+  - name: "NBA 2026 - SA Spurs"
+    polymarket:
+      yes_token_id: "102227184035967850089766981958743064457339118173548431660886438726896222843254"
+      no_token_id:  "12636035070565821048178968461063687179393834041535317885287743395873720755118"
+    kalshi:
+      ticker: "KXNBA-26-SAS"
+
+  - name: "NHL 2026 - Carolina"
+    polymarket:
+      yes_token_id: "79397003434468715775480922117285203652110865791390656395657957066470661722480"
+      no_token_id:  "40473977441010332007887229299980126707900816205713676157646215720073415416624"
+    kalshi:
+      ticker: "KXNHL-26-CAR"
+
+  - name: "NHL 2026 - Vegas"
+    polymarket:
+      yes_token_id: "68803485030073596962715540294172682212192134248970512695855620898253368033218"
+      no_token_id:  "58534831224432332845742394199681128700782343287162911891204466367752298448751"
+    kalshi:
+      ticker: "KXNHL-26-VGK"
+
+  - name: "NHL 2026 - Colorado"
+    polymarket:
+      yes_token_id: "101738487887518832481587379955535423775326921556438741919099866785354159699479"
+      no_token_id:  "87978082071653935678874296685430503892266481242311708420787197372467948088235"
+    kalshi:
+      ticker: "KXNHL-26-COL"
+
+  # ----------------------------- Short-TTE markets (resolve within ~7 days) -----------------------------
+  # Added 2026-05-25 to give the system actual resolution events while the
+  # other markets sit weeks/months out. These are the cycle generators.
+
+  # UCL Final 2025-26: PSG vs Arsenal, resolves 2026-05-31. Mid-priced, deep books.
+  - name: "UCL 2026 - PSG"
+    polymarket:
+      yes_token_id: "104259436423064082971150541232006260758664018969024622611484550356541952860834"
+      no_token_id:  "17522237181479319953129418683394157683167669858670412329571078616243234898741"
+    kalshi:
+      ticker: "KXUCL-26-PSG"
+
+  - name: "UCL 2026 - Arsenal"
+    polymarket:
+      yes_token_id: "76184513907290761912636659055080401703643418316153242056949287928791438454394"
+      no_token_id:  "40207448075213637709805668474726325753733020974923638056549809058860608450985"
+    kalshi:
+      ticker: "KXUCL-26-ARS"
+
+  # BTC May "dip to" pairs: Polymarket "Will Bitcoin dip to $X in May?" ↔
+  # Kalshi KXBTCMINMON "Below $X" (monthly minimum). Resolves 2026-05-31.
+  # Resolution-source caveat: Poly uses Coinbase composite, Kalshi uses CME CF.
+  - name: "BTC dip to $70k in May 2026"
+    polymarket:
+      yes_token_id: "1455516093280115266726125015118886836497350270272083258816253748264172151708"
+      no_token_id:  "95485861341380608519980927436620979639471363690968268890982766249775308601106"
+    kalshi:
+      ticker: "KXBTCMINMON-BTC-26MAY31-7000000"
+
+  - name: "BTC dip to $65k in May 2026"
+    polymarket:
+      yes_token_id: "27725940653624584419402352523079290062969537031166811897465708046373420997774"
+      no_token_id:  "70599542532871511059574704954153700290799668003780454021485405353625366389155"
+    kalshi:
+      ticker: "KXBTCMINMON-BTC-26MAY31-6500000"
+
+  # ----------------------------- Same-day game markets -----------------------------
+  # NBA Western Conference Finals Game 5: SAS @ OKC, May 26 evening.
+  # Polymarket "Spurs vs. Thunder" outcomes=['Spurs','Thunder'] with Spurs YES
+  # currently 0.375. Kalshi KXNBAGAME-26MAY26SASOKC-SAS at 0.37/0.38 — tight
+  # alignment confirms same event. Resolves <24h.
+  - name: "NBA Game5 - Spurs at Thunder"
+    polymarket:
+      yes_token_id: "53919346162802748120847155404148342783978231188785990665971474884640857460504"
+      no_token_id:  "45942712780956716290595528630059826510539112426790184133339143529925294470101"
+    kalshi:
+      ticker: "KXNBAGAME-26MAY26SASOKC-SAS"
